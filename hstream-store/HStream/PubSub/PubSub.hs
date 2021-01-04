@@ -8,6 +8,7 @@ module HStream.PubSub.PubSub where --(Topic (..), pubMessage, sub, subEnd, poll)
 import Control.Concurrent
 import Control.Exception
 import Control.Monad
+import Data.Int (Int32)
 import Data.Word (Word64)
 import qualified HStream.Store as S
 import System.Random
@@ -42,34 +43,98 @@ getRandomLogID = do
 
 type ClientID = Text
 
--- | commit a topic ClientID's SequenceNum
--- v0 <- commit client tp "aaa" (S.SequenceNum rv) 3 1000000
-commit ::
-  S.StreamClient -> -- logdevice client
-  Topic -> -- Topic
-  ClientID -> -- client id
-  S.SequenceNum -> -- sequence number
+createTopic ::
+  S.StreamClient ->
+  Topic ->
   Int -> -- Replication Factor
-  Int -> -- sleep time after commit logGroup created
-  IO (S.SequenceNum)
-commit client (Topic topic) cid (S.SequenceNum seqN) rf slt =
-  pubMessage
+  IO (Either String S.StreamTopicGroup)
+createTopic client topic rf = do
+  at <- S.newTopicAttributes
+  S.setTopicReplicationFactor at rf
+  logID <- getRandomLogID
+  let li = S.mkTopicID logID
+  v <- try $ S.makeTopicGroupSync client (topicToCbytes topic <> topicTail) li li at True
+  case v of
+    Left (e :: SomeException) -> do
+      return $ Left $ show e
+    Right v0 -> do
+      return $ Right v0
+
+-- | create topic and record message
+pub ::
+  S.StreamClient -> -- client
+  Topic -> --- Topic
+  Message -> -- Message
+  IO (Either String S.SequenceNum)
+pub client topic message = do
+  try (S.getTopicGroupSync client (topicToCbytes topic <> topicTail)) >>= \case
+    Left (e :: SomeException) -> return $ Left (show e)
+    Right gs -> do
+      (a, _) <- S.topicGroupGetRange gs
+      Right <$> S.appendSync client a message Nothing
+
+-- | sub a topic, return the StreamReader. You follow the tail value
+sub ::
+  S.StreamClient ->
+  Int32 -> --timeout
+  Topic ->
+  IO (Either String S.StreamReader)
+sub client timeout tp = do
+  sreader <- S.newStreamReader client 1 4096
+  S.readerSetTimeout sreader timeout
+  try (S.getTopicGroupSync client (topicToCbytes tp <> topicTail)) >>= \case
+    Left (e :: SomeException) -> return $ Left (show e)
+    Right gs -> do
+      (a, _) <- S.topicGroupGetRange gs
+      end <- S.getTailSequenceNum client a
+      S.readerStartReading sreader a (end + 1) maxBound
+      return $ Right sreader
+
+subs ::
+  S.StreamClient ->
+  Int -> -- max sub number
+  Int32 -> -- timeout
+  [Topic] ->
+  IO ([Either String S.StreamReader])
+subs client ms timeout tps = do
+  sreader <- S.newStreamReader client (fromIntegral ms) 4096
+  S.readerSetTimeout sreader timeout
+  forM tps $ \tp -> do
+    try (S.getTopicGroupSync client (topicToCbytes tp <> topicTail)) >>= \case
+      Left (e :: SomeException) -> return $ Left (show e)
+      Right gs -> do
+        (a, _) <- S.topicGroupGetRange gs
+        end <- S.getTailSequenceNum client a
+        S.readerStartReading sreader a (end + 1) maxBound
+        return $ Right sreader
+
+-- | poll value, You can specify the batch size
+poll :: S.StreamReader -> Int -> IO [S.DataRecord]
+poll sreader m = S.readerRead sreader m
+
+createClientID ::
+  S.StreamClient ->
+  Topic ->
+  ClientID ->
+  Int ->
+  IO (Either String S.StreamTopicGroup)
+createClientID client (Topic tp) cid rf =
+  createTopic client (Topic $ tp <> "_clientID_" <> cid) rf
+
+-- | commit a topic ClientID's SequenceNum
+commit ::
+  S.StreamClient ->
+  Topic ->
+  ClientID ->
+  S.SequenceNum ->
+  IO (Either String S.SequenceNum)
+commit client (Topic topic) cid (S.SequenceNum seqN) =
+  pub
     client
     (Topic $ topic <> "_clientID_" <> cid)
     (build $ encodePrim seqN)
-    rf
-    slt
 
 -- | read last commit SequenceNum
--- main1 :: IO ()
--- main1 = do
---   print "start"
---   _ <- S.setLoggerlevelError
---   client <- S.newStreamClient "/data/logdevice/logdevice.conf"
---   v0 <- commit client tp "aaa" (S.SequenceNum rv) 3 1000000
---   v1 <- readLastCommit client tp "aaa"
---   print v1
---   print v0
 readLastCommit ::
   S.StreamClient ->
   Topic ->
@@ -82,98 +147,11 @@ readLastCommit client (Topic tp) cid = do
     Right gs -> do
       (a, _) <- S.topicGroupGetRange gs
       end <- S.getTailSequenceNum client a
-      i <- S.startReading sreader a end maxBound
-      case i of
-        0 -> do
-          v <- S.read sreader 1
-          case v of
-            Just [S.DataRecord _ _ bs] ->
-              case P.parse' @Word64 P.decodePrim bs of
-                Left e -> return $ Left (show e)
-                Right s -> return $ Right (S.SequenceNum s)
-            _ -> return $ Left "can't find commit"
-        _ -> return $ Left $ "read last commit error " ++ show i
-
--- | create topic and record message
--- when topic first arrive, we create a topic logGroup. this logGroup include two logId: a , a+1
--- a: record log message
--- a+1: record log metadata (e: commite message)
---
--- e:
--- fun :: IO ()
--- fun = do
---   _ <- S.setLoggerlevelError
---   client <- S.newStreamClient "/data/logdevice/logdevice.conf"
---   forever $ do
---     t : m : _ <- Prelude.words <$> getLine
---     let tp = Topic (Z.Data.Text.pack t)
---     v <- pubMessage client tp (packASCII m) 2 1000000
---     print v
-pubMessage ::
-  S.StreamClient -> -- client
-  Topic -> --- Topic
-  Message -> -- Message
-  Int -> -- Replication Factor
-  Int -> -- sleep time after logGroup created
-  IO (S.SequenceNum)
-pubMessage client topic message rf slt = do
-  try (S.getTopicGroupSync client (topicToCbytes topic <> topicTail)) >>= \case
-    Left (_ :: SomeException) -> do
-      at <- S.newTopicAttributes
-      S.setTopicReplicationFactor at rf
-      logID <- getRandomLogID
-      let li = S.mkTopicID logID
-      v <- try $ S.makeTopicGroupSync client (topicToCbytes topic <> topicTail) li li at True
+      S.readerStartReading sreader a end maxBound
+      v <- S.readerRead sreader 1
       case v of
-        Left (_ :: SomeException) -> do
-          pubMessage client topic message rf slt
-        Right _ -> do
-          threadDelay slt
-          pubMessage client topic message rf slt
-    Right gs -> do
-      (a, _) <- S.topicGroupGetRange gs
-      S.appendSync client a message Nothing
-
--- | sub a Topic, return the StreamReader. You need to specify a valid start SequenceNum
-sub ::
-  S.StreamClient ->
-  Topic ->
-  S.SequenceNum -> -- start SequenceNum
-  IO (Either String S.StreamReader)
-sub client tp start = do
-  sreader <- S.newStreamReader client 1 4096
-  try (S.getTopicGroupSync client (topicToCbytes tp <> topicTail)) >>= \case
-    Left (e :: SomeException) -> return $ Left (show e)
-    Right gs -> do
-      (a, _) <- S.topicGroupGetRange gs
-      _ <- S.startReading sreader a start maxBound
-      return $ Right sreader
-
--- | sub a topic, return the StreamReader. You follow the tail value
-subEnd ::
-  S.StreamClient ->
-  Topic ->
-  IO (Either String S.StreamReader)
-subEnd client tp = do
-  sreader <- S.newStreamReader client 1 4096
-  try (S.getTopicGroupSync client (topicToCbytes tp <> topicTail)) >>= \case
-    Left (e :: SomeException) -> return $ Left (show e)
-    Right gs -> do
-      (a, _) <- S.topicGroupGetRange gs
-      end <- S.getTailSequenceNum client a
-      i <- S.startReading sreader a (end + 1) maxBound
-      case i of
-        0 -> return $ Right sreader
-        _ -> return $ Left $ "sub error " ++ show i
-
--- | poll value, You can specify the batch size
--- e:
--- fun :: IO ()
--- fun = do
---   _ <- S.setLoggerlevelError
---   client <- S.newStreamClient "/data/logdevice/logdevice.conf"
---   Right sreader <- subEnd client (Topic "a/a")
---   record <- poll sreader 1  -- poll a value,
---   print record
-poll :: S.StreamReader -> Int -> IO (Maybe [S.DataRecord])
-poll sreader m = S.read sreader m
+        [S.DataRecord _ _ bs] ->
+          case P.parse' @Word64 P.decodePrim bs of
+            Left e -> return $ Left (show e)
+            Right s -> return $ Right (S.SequenceNum s)
+        _ -> return $ Left "can't find commit"
