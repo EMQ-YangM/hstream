@@ -93,7 +93,7 @@ sub client timeout tp = do
 subs ::
   S.StreamClient ->
   Int -> -- max sub number
-  Int32 -> -- timeout
+  Int32 -> -- timeout ms
   [Topic] ->
   IO ([Either String S.StreamReader])
 subs client ms timeout tps = do
