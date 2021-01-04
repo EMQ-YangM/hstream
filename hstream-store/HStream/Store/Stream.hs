@@ -16,7 +16,7 @@ module HStream.Store.Stream
   , topicIDInvalid'
   , mkTopicID
     -- ** Sequence Number
-  , SequenceNum
+  , SequenceNum(..)
   , FFI.sequenceNumInvalid
     -- ** Data Record
   , DataRecord (..)
