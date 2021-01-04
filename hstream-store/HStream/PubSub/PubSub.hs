@@ -76,12 +76,12 @@ pub client topic message = do
 -- | sub a topic, return the StreamReader. You follow the tail value
 sub ::
   S.StreamClient ->
-  Int32 -> --timeout
+  -- Int32 -> --timeout
   Topic ->
   IO (Either String S.StreamReader)
-sub client timeout tp = do
+sub client tp = do
   sreader <- S.newStreamReader client 1 4096
-  S.readerSetTimeout sreader timeout
+  -- S.readerSetTimeout sreader timeout
   try (S.getTopicGroupSync client (topicToCbytes tp <> topicTail)) >>= \case
     Left (e :: SomeException) -> return $ Left (show e)
     Right gs -> do
@@ -93,12 +93,12 @@ sub client timeout tp = do
 subs ::
   S.StreamClient ->
   Int -> -- max sub number
-  Int32 -> -- timeout ms
+  -- Int32 -> -- timeout ms
   [Topic] ->
   IO ([Either String S.StreamReader])
-subs client ms timeout tps = do
+subs client ms tps = do
   sreader <- S.newStreamReader client (fromIntegral ms) 4096
-  S.readerSetTimeout sreader timeout
+  -- S.readerSetTimeout sreader timeout
   forM tps $ \tp -> do
     try (S.getTopicGroupSync client (topicToCbytes tp <> topicTail)) >>= \case
       Left (e :: SomeException) -> return $ Left (show e)
@@ -111,6 +111,9 @@ subs client ms timeout tps = do
 -- | poll value, You can specify the batch size
 poll :: S.StreamReader -> Int -> IO [S.DataRecord]
 poll sreader m = S.readerRead sreader m
+
+pollWithTimeout :: S.StreamReader -> Int -> Int32 -> IO [S.DataRecord]
+pollWithTimeout sreader m timeout = S.readerSetTimeout sreader timeout >> S.readerRead sreader m
 
 createClientID ::
   S.StreamClient ->
