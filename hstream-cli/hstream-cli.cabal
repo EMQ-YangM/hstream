@@ -1,4 +1,4 @@
-cabal-version: 1.12
+cabal-version:      2.2
 
 -- This file has been generated from package.yaml by hpack version 0.34.3.
 --
@@ -12,7 +12,7 @@ bug-reports:    https://github.com/githubuser/hstream-cli/issues
 author:         Author name here
 maintainer:     example@example.com
 copyright:      2020 Author name here
-license:        BSD3
+license:            BSD-3-Clause
 license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
@@ -47,12 +47,11 @@ library
     , swagger2
     , text
     , time
-    , uuid
     , warp
      , aeson
      , hstream-lib
      , hstream-sql
-     , random
+     , random ^>= 1.2
      , rio
      , scientific
      , text
@@ -77,14 +76,13 @@ executable client
     , http-conduit
     , optparse-applicative
     , pretty-simple
-    , random
+    , random ^>= 1.2
     , servant
     , servant-server
     , servant-swagger
     , swagger2
     , text
     , time
-    , uuid
     , warp
   default-language: Haskell2010
 
@@ -105,13 +103,23 @@ executable server
     , http-conduit
     , optparse-applicative
     , pretty-simple
-    , random
+    , random ^>= 1.2
     , servant
     , servant-server
     , servant-swagger
     , swagger2
     , text
     , time
-    , uuid
     , warp
   default-language: Haskell2010
+
+test-suite hstream-cli-test
+  type:               exitcode-stdio-1.0
+  main-is:            Spec.hs
+  hs-source-dirs:     test
+  build-depends:      base          >= 4.11 && < 5
+  default-language:   Haskell2010
+  build-tool-depends: hspec-discover:hspec-discover == 2.*
+  ghc-options:        -Wall -Wcompat -Widentities -Wincomplete-record-updates
+                      -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
+                      -threaded -rtsopts -with-rtsopts=-N

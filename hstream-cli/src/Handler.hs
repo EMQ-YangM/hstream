@@ -20,8 +20,6 @@ import Data.Text.IO (getLine)
 import qualified Data.Text.IO as TIO
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TLE
-import Data.UUID (UUID)
-import Data.UUID.V1 (nextUUID)
 import HStream.Processor
   ( MessageStoreType (Mock),
     MockMessage (..),
@@ -52,7 +50,7 @@ import Servant
     type (:<|>) ((:<|>)),
   )
 import Servant.Swagger (HasSwagger (toSwagger))
-import System.Random (Random (randomR, randomRIO), getStdRandom)
+import System.Random (getStdRandom, randomIO, randomR, randomRIO)
 import Type
 import qualified Prelude as P
 
@@ -67,7 +65,7 @@ server1 = handleDatabase :<|> handleTable :<|> handleStream
 handleDatabase :: Handler [DatabaseInfo] :<|> ((p1 -> Handler DatabaseInfo) :<|> (p2 -> Handler Resp))
 handleDatabase = handleShowDatabases :<|> handleCreateDatabae :<|> handleUseDatabase
 
-handleTable :: Handler [TableInfo] :<|> ((Table -> Handler TableInfo) :<|> ((UUID -> Handler TableInfo) :<|> (p -> Handler Resp)))
+handleTable :: Handler [TableInfo] :<|> ((Table -> Handler TableInfo) :<|> ((Int -> Handler TableInfo) :<|> (p -> Handler Resp)))
 handleTable = handleShowTables :<|> handleCreateTable :<|> handleQueryTable :<|> handleDeleteTable
 
 handleStream :: Handler [StreamInfo] :<|> ((StreamSql -> Handler StreamInfo) :<|> ((StreamId -> Handler StreamInfo) :<|> (p -> Handler Resp)))
@@ -88,7 +86,7 @@ handleShowTables = replicateM 3 $ TableInfo "table name" <$> getUUID
 handleCreateTable :: Table -> Handler TableInfo
 handleCreateTable t = TableInfo (ctname t) <$> getUUID
 
-handleQueryTable :: Applicative f => UUID -> f TableInfo
+handleQueryTable :: Applicative f => Int -> f TableInfo
 handleQueryTable t = pure $ TableInfo "random table" t
 
 handleDeleteTable :: Applicative m => p -> m Resp
@@ -106,16 +104,14 @@ handleDeleteStream _ = return $ OK "delete stream success"
 app1 :: Application
 app1 = serve server1API server1
 
-getUUID :: Handler UUID
+getUUID :: Handler Int
 getUUID =
-  liftIO nextUUID >>= \case
-    Nothing -> getUUID
-    Just v -> return v
+  liftIO randomIO
 
-gs :: Handler [UUID]
+gs :: Handler [Int]
 gs = getUUIDs 4
 
-getUUIDs :: Int -> Handler [UUID]
+getUUIDs :: Int -> Handler [Int]
 getUUIDs v = do
   n <- liftIO $ randomRIO (0, v)
   replicateM n getUUID

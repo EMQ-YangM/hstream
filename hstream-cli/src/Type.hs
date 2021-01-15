@@ -7,7 +7,6 @@ import Data.Aeson (FromJSON, ToJSON)
 import Data.Data (Typeable)
 import Data.Swagger (ToSchema)
 import Data.Text (Text)
-import Data.UUID (UUID)
 import GHC.Generics (Generic)
 
 -- | Response
@@ -40,15 +39,15 @@ data Database = Database
   }
   deriving (Show, Eq, Generic, Typeable, FromJSON, ToJSON)
 
-type DatabaseId = UUID
+type DatabaseId = Int
 
 data TableInfo = TableInfo
   { tsfbiname :: Text,
-    tbid :: UUID
+    tbid :: Int
   }
   deriving (Show, Eq, Generic, Typeable, FromJSON, ToJSON)
 
-type TableId = UUID
+type TableId = Int
 
 newtype Table = Table
   { ctname :: Text
@@ -67,7 +66,7 @@ data StreamSql = StreamSql
   }
   deriving (Show, Eq, Generic, Typeable, FromJSON, ToJSON)
 
-type StreamId = UUID
+type StreamId = Int
 
 instance ToSchema Resp
 
