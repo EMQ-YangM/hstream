@@ -4,6 +4,7 @@ packages:
   hstream-hesp
   hstream-store
   hstream-sql
+  hstream-cli
 
 source-repository-package
   type: git
