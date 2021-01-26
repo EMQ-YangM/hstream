@@ -1,13 +1,13 @@
 {-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric  #-}
 
 module Type where
 
-import Data.Aeson (FromJSON, ToJSON)
-import Data.Data (Typeable)
-import Data.Swagger (ToSchema)
-import Data.Text (Text)
-import GHC.Generics (Generic)
+import           Data.Aeson   (FromJSON, ToJSON)
+import           Data.Data    (Typeable)
+import           Data.Swagger (ToSchema)
+import           Data.Text    (Text)
+import           GHC.Generics (Generic)
 
 -- | Response
 -- OK
@@ -27,15 +27,15 @@ data ReqSql = ReqSql
   deriving (Show, Eq, Generic, Typeable, FromJSON, ToJSON)
 
 data DatabaseInfo = DatabaseInfo
-  { dbid :: DatabaseId,
-    dbtables :: [TableId],
+  { dbid      :: DatabaseId,
+    dbtables  :: [TableId],
     dbstreams :: [StreamId]
   }
   deriving (Show, Eq, Generic, Typeable, FromJSON, ToJSON)
 
 data Database = Database
   { dbname :: Text,
-    dbc :: Text
+    dbc    :: Text
   }
   deriving (Show, Eq, Generic, Typeable, FromJSON, ToJSON)
 
@@ -43,7 +43,7 @@ type DatabaseId = Int
 
 data TableInfo = TableInfo
   { tsfbiname :: Text,
-    tbid :: Int
+    tbid      :: Int
   }
   deriving (Show, Eq, Generic, Typeable, FromJSON, ToJSON)
 
@@ -56,12 +56,12 @@ newtype Table = Table
 
 data StreamInfo = StreamInfo
   { strinfo :: Text,
-    strid :: StreamId
+    strid   :: StreamId
   }
   deriving (Show, Eq, Generic, Typeable, FromJSON, ToJSON)
 
 data StreamSql = StreamSql
-  { strname :: Text,
+  { strname   :: Text,
     streamSql :: ReqSql
   }
   deriving (Show, Eq, Generic, Typeable, FromJSON, ToJSON)

@@ -43,8 +43,8 @@ library
                       HStream.Store.Stream.Appender
                       HStream.Store.Stream.Reader
   build-depends:      base       >= 4.11 && < 5
-                    , Z-Data     == 0.3.0.0
-                    , Z-IO       == 0.3.0.0
+                    , Z-Data 
+                    , Z-IO  
                     , random
                     , unordered-containers
                     , hashable
@@ -75,7 +75,7 @@ test-suite hstream-store-test
                       HStream.Store.TopicSpec
   hs-source-dirs:     test
   build-depends:      base          >= 4.11 && < 5
-                    , Z-Data        == 0.3.0.0
+                    , Z-Data
                     , hspec
                     , time
                     , hstream-store

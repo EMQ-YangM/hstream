@@ -1,21 +1,21 @@
 {-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StrictData #-}
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude         #-}
+{-# LANGUAGE OverloadedStrings         #-}
+{-# LANGUAGE RecordWildCards           #-}
+{-# LANGUAGE StrictData                #-}
 
 module HStream.Processor.Internal where
 
-import Control.Exception (throw)
-import Data.Default
-import Data.Typeable
-import HStream.Error (HStreamError (..))
-import HStream.Store
-import HStream.Type
-import RIO
-import qualified RIO.HashMap as HM
-import qualified RIO.HashSet as HS
-import qualified RIO.Text as T
+import           Control.Exception (throw)
+import           Data.Default
+import           Data.Typeable
+import           HStream.Error     (HStreamError (..))
+import           HStream.Store
+import           HStream.Type
+import           RIO
+import qualified RIO.HashMap       as HM
+import qualified RIO.HashSet       as HS
+import qualified RIO.Text          as T
 
 newtype Processor kin vin = Processor {runP :: Record kin vin -> RIO TaskContext ()}
 
@@ -31,8 +31,8 @@ mkEProcessor proc = EProcessor $ \(ERecord record) ->
     Nothing -> throw $ TypeCastError ("mkEProcessor: type cast error, real record type is: " `T.append` T.pack (show (typeOf record)))
 
 data Record k v = Record
-  { recordKey :: Maybe k,
-    recordValue :: v,
+  { recordKey       :: Maybe k,
+    recordValue     :: v,
     recordTimestamp :: Timestamp
   }
 
@@ -42,11 +42,11 @@ mkERecord :: (Typeable k, Typeable v) => Record k v -> ERecord
 mkERecord = ERecord
 
 data TaskTopologyConfig = TaskTopologyConfig
-  { ttcName :: T.Text,
+  { ttcName    :: T.Text,
     sourceCfgs :: HM.HashMap T.Text InternalSourceConfig,
-    topology :: HM.HashMap T.Text (EProcessor, [T.Text]),
-    sinkCfgs :: HM.HashMap T.Text InternalSinkConfig,
-    stores :: HM.HashMap T.Text (EStateStore, HS.HashSet T.Text)
+    topology   :: HM.HashMap T.Text (EProcessor, [T.Text]),
+    sinkCfgs   :: HM.HashMap T.Text InternalSinkConfig,
+    stores     :: HM.HashMap T.Text (EStateStore, HS.HashSet T.Text)
   }
 
 instance Default TaskTopologyConfig where
@@ -100,31 +100,31 @@ instance Monoid TaskTopologyConfig where
   mempty = def
 
 data InternalSourceConfig = InternalSourceConfig
-  { iSourceName :: T.Text,
+  { iSourceName      :: T.Text,
     iSourceTopicName :: T.Text
   }
 
 data InternalSinkConfig = InternalSinkConfig
-  { iSinkName :: T.Text,
+  { iSinkName      :: T.Text,
     iSinkTopicName :: T.Text
   }
 
 type TaskBuilder = TaskTopologyConfig
 
 data Task = Task
-  { taskName :: T.Text,
-    taskSourceConfig :: HM.HashMap T.Text InternalSourceConfig,
+  { taskName             :: T.Text,
+    taskSourceConfig     :: HM.HashMap T.Text InternalSourceConfig,
     taskTopologyReversed :: HM.HashMap T.Text (EProcessor, [T.Text]),
-    taskTopologyForward :: HM.HashMap T.Text (EProcessor, [T.Text]),
-    taskSinkConfig :: HM.HashMap T.Text InternalSinkConfig,
-    taskStores :: HM.HashMap T.Text (EStateStore, HS.HashSet T.Text)
+    taskTopologyForward  :: HM.HashMap T.Text (EProcessor, [T.Text]),
+    taskSinkConfig       :: HM.HashMap T.Text InternalSinkConfig,
+    taskStores           :: HM.HashMap T.Text (EStateStore, HS.HashSet T.Text)
   }
 
 data TaskContext = TaskContext
-  { taskConfig :: Task,
-    tctLogFunc :: LogFunc,
+  { taskConfig   :: Task,
+    tctLogFunc   :: LogFunc,
     curProcessor :: IORef T.Text,
-    tcTimestamp :: IORef Int64
+    tcTimestamp  :: IORef Int64
   }
 
 instance HasLogFunc TaskContext where

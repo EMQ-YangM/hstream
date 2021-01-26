@@ -1,58 +1,56 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PackageImports    #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TypeOperators     #-}
 
 module Handler where
 
-import Api (ServerAPI1)
-import Control.Monad (replicateM)
-import Control.Monad.IO.Class (MonadIO (liftIO))
+import           Api                           (ServerAPI1)
+import           Control.Monad                 (replicateM)
+import           Control.Monad.IO.Class        (MonadIO (liftIO))
 ------------------------------------------------------------------
-import Data.Aeson
-import Data.Aeson (encode)
-import qualified Data.ByteString.Lazy.Char8 as BSL8
-import qualified Data.HashMap.Strict as HM
-import Data.Scientific
-import Data.Text.IO (getLine)
-import qualified Data.Text.IO as TIO
-import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.Encoding as TLE
-import HStream.Processor
-  ( MessageStoreType (Mock),
-    MockMessage (..),
-    TaskConfig (..),
-    mkMockTopicConsumer,
-    mkMockTopicProducer,
-    mkMockTopicStore,
-    runTask,
-  )
-import HStream.Topic
-  ( RawConsumerRecord (..),
-    RawProducerRecord (..),
-    TopicConsumer (..),
-    TopicProducer (..),
-  )
-import HStream.Util (getCurrentTimestamp)
-import Language.SQL
-import Language.SQL (streamCodegen)
-import RIO hiding (Handler)
-import qualified RIO.ByteString.Lazy as BL
-import Servant
-  ( Application,
-    Handler,
-    Proxy (..),
-    Server,
-    layout,
-    serve,
-    type (:<|>) ((:<|>)),
-  )
-import Servant.Swagger (HasSwagger (toSwagger))
-import System.Random (getStdRandom, randomIO, randomR, randomRIO)
-import Type
-import qualified Prelude as P
+import           Data.Aeson                    (encode)
+import           Data.Aeson                    as A
+import qualified Data.ByteString.Lazy.Char8    as BSL8
+import qualified Data.HashMap.Strict           as HM
+import           Data.Scientific
+import qualified Data.Text                     as DT
+import           Data.Text.IO                  (getLine)
+import qualified Data.Text.IO                  as TIO
+import qualified Data.Text.Lazy                as TL
+import qualified Data.Text.Lazy.Encoding       as TLE
+import           HStream.Processor
+import           HStream.Processor             (MessageStoreType (Mock),
+                                                MockMessage (..),
+                                                TaskConfig (..),
+                                                mkMockTopicConsumer,
+                                                mkMockTopicProducer,
+                                                mkMockTopicStore, runTask)
+import           HStream.PubSub.Types
+import           "hstream-store" HStream.Store
+import           HStream.Topic                 (RawConsumerRecord (..),
+                                                RawProducerRecord (..),
+                                                TopicConsumer (..),
+                                                TopicProducer (..))
+import           HStream.TopicApi
+import           HStream.Util                  (getCurrentTimestamp)
+import           Language.SQL
+import           Language.SQL                  (streamCodegen)
+import qualified Prelude                       as P
+import           RIO                           hiding (Handler)
+import qualified RIO.ByteString.Lazy           as BL
+import           Servant                       (Application, Handler,
+                                                Proxy (..), Server, layout,
+                                                serve, type (:<|>) ((:<|>)))
+import           Servant.Swagger               (HasSwagger (toSwagger))
+import           System.Random                 (getStdRandom, randomIO, randomR,
+                                                randomRIO)
+import           Type
+import qualified Z.Data.Text                   as ZT
+import           Z.Foreign
 
 -------------------------------------------------------------------------
 
@@ -132,9 +130,17 @@ handleCreateStream t@(StreamSql name (ReqSql version seqValue)) = do
     let hTopicName = "humiditySource"
     let sTopicName = "demoSink"
 
-    mockStore <- mkMockTopicStore
-    mp <- mkMockTopicProducer mockStore
-    mc' <- mkMockTopicConsumer mockStore
+
+    let path = "/data/store/logdevice.conf"
+
+ -- client <- mkAdminClient $ AdminClientConfig path
+ -- createTopics client [ Topic "temptemperatureSource"
+ --                     , Topic "humiditySource"
+ --                     , Topic "demoSink"
+ --                     ] 3
+
+    mp <- mkProducer $ ProducerConfig path
+    mc' <- mkConsumer (ConsumerConfig path "consumer")
 
     async . forever $ do
       threadDelay 1000000
@@ -144,8 +150,6 @@ handleCreateStream t@(StreamSql name (ReqSql version seqValue)) = do
         RawProducerRecord
           { rprTopic = hTopicName,
             rprKey = mmKey,
-            --rprValue = encode $
-            --  HM.fromList [ ("humidity" :: Text, (HM.!) ((fromJust . decode) mmValue :: Object) "humidity") ],
             rprValue = mmValue,
             rprTimestamp = mmTimestamp
           }
@@ -154,24 +158,29 @@ handleCreateStream t@(StreamSql name (ReqSql version seqValue)) = do
         RawProducerRecord
           { rprTopic = tTopicName,
             rprKey = mmKey,
-            --rprValue = encode $
-            --  HM.fromList [ ("temperature" :: Text, (HM.!) ((fromJust . decode) mmValue :: Object) "temperature") ],
             rprValue = mmValue,
             rprTimestamp = mmTimestamp
           }
 
     mc <- subscribe mc' [sTopicName]
-    _ <- async $
+    async $
       forever $ do
-        records <- pollRecords mc 1000000
+        P.print "poll message1"
+        records <- pollRecords mc 1000
+        P.print "poll message2"
         forM_ records $ \RawConsumerRecord {..} ->
           P.putStr "detect abnormal data: " >> BL.putStrLn rcrValue
+
+
+    mp1 <- mkProducer $ ProducerConfig path
+    mc1 <- mkConsumer (ConsumerConfig path "consumer1")
+
     async $ do
       logOptions <- logOptionsHandle stderr True
       withLogFunc logOptions $ \lf -> do
         let taskConfig =
               TaskConfig
-                { tcMessageStoreType = Mock mockStore,
+                { tcMessageStoreType = LogDevice mc1 mp1,
                   tcLogFunc = lf
                 }
         runTask taskConfig task
@@ -192,6 +201,60 @@ mkMockData = do
   return
     MockMessage
       { mmTimestamp = ts,
-        mmKey = Just $ TLE.encodeUtf8 $ TL.pack $ show k,
+        mmKey = Just $ A.encode $ HM.fromList [("well" :: DT.Text,String $ DT.pack $ show k)],
         mmValue = encode r
       }
+
+tRwaCons :: RawConsumerRecord -> ConsumerRecord
+tRwaCons RawConsumerRecord {..} =
+  ConsumerRecord
+    { crTopic = Topic $ ZT.pack $ DT.unpack rcrTopic,
+      crOffset = SequenceNum rcrOffset,
+      crTimestamp = rcrTimestamp,
+      crKey = fmap (fromByteString . BL.toStrict) rcrKey,
+      crValue = fromByteString $ BL.toStrict rcrValue
+    }
+
+tRProd :: RawProducerRecord -> ProducerRecord
+tRProd RawProducerRecord {..} =
+  ProducerRecord
+    { prTopic = Topic $ ZT.pack $ DT.unpack rprTopic,
+      prKey = fmap (fromByteString . BL.toStrict) rprKey,
+      prValue = fromByteString $ BL.toStrict rprValue,
+      prTimestamp = rprTimestamp
+    }
+
+tCons :: ConsumerRecord -> RawConsumerRecord
+tCons ConsumerRecord {..} =
+  RawConsumerRecord
+    { rcrTopic = DT.pack $ ZT.unpack $ getTopic crTopic,
+      rcrOffset = let SequenceNum v = crOffset in v,
+      rcrTimestamp = crTimestamp,
+      rcrKey = fmap (BL.fromStrict . toByteString) crKey,
+      rcrValue = BL.fromStrict $ toByteString crValue
+    }
+
+tProd :: ProducerRecord -> RawProducerRecord
+tProd ProducerRecord {..} =
+  RawProducerRecord
+    { rprTopic = DT.pack $ ZT.unpack $ getTopic prTopic,
+      rprKey = fmap (BL.fromStrict . toByteString) prKey,
+      rprValue = BL.fromStrict $ toByteString prValue,
+      rprTimestamp = prTimestamp
+    }
+
+tTNT :: DT.Text -> Topic
+tTNT t = Topic $ ZT.pack $ DT.unpack t
+
+instance TopicConsumer Consumer where
+  subscribe cs tns = subs cs (fmap tTNT tns)
+  pollRecords cs timeout = do
+    v <- pollMessages cs 1 (fromIntegral timeout)
+    P.print v
+    return (fmap tCons v)
+
+instance TopicProducer Producer where
+  send p rpr = do
+    let pr = tRProd rpr
+    P.print $ rprValue rpr
+    sendMessage p pr

@@ -33,7 +33,7 @@ ctopic = do
 
 pubs = do
   pd <- mkProducer $ ProducerConfig path
-  t <- getCurrentTime
+  t <- getCurrentTimestamp'
   sendMessageBatch pd $
     [ProducerRecord
        (Topic "a/a/a")
@@ -43,7 +43,8 @@ pubs = do
      ]
 
 consu = do
-  cs <- mkConsumer (ConsumerConfig path "start") [Topic "a/a/a"]
+  cs1 <- mkConsumer (ConsumerConfig path "start")
+  cs <- subs cs1 [Topic "a/a/a"]
   pubs
   v <- pollMessages cs 1 1000
   commitOffsets cs

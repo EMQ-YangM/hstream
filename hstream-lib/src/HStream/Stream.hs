@@ -1,7 +1,7 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StrictData #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE StrictData        #-}
 
 module HStream.Stream
   ( mkStreamBuilder,
@@ -25,20 +25,20 @@ module HStream.Stream
   )
 where
 
-import Data.Maybe
-import HStream.Encoding
-import HStream.Processor
-import HStream.Processor.Internal
-import HStream.Store
-import HStream.Stream.GroupedStream
-import HStream.Stream.Internal
-import HStream.Stream.JoinWindows
-import HStream.Table
-import HStream.Topic
-import HStream.Type
-import RIO
-import qualified RIO.ByteString.Lazy as BL
-import qualified RIO.Text as T
+import           Data.Maybe
+import           HStream.Encoding
+import           HStream.Processor
+import           HStream.Processor.Internal
+import           HStream.Store
+import           HStream.Stream.GroupedStream
+import           HStream.Stream.Internal
+import           HStream.Stream.JoinWindows
+import           HStream.Table
+import           HStream.Topic
+import           HStream.Type
+import           RIO
+import qualified RIO.ByteString.Lazy          as BL
+import qualified RIO.Text                     as T
 
 data StreamBuilder = StreamBuilder
   { sbInternalBuilder :: InternalStreamBuilder
@@ -50,14 +50,14 @@ mkStreamBuilder taskName = do
   return StreamBuilder {sbInternalBuilder = internalStreamBuilder}
 
 data StreamSourceConfig k v = StreamSourceConfig
-  { sscTopicName :: TopicName,
-    sscKeySerde :: Serde k,
+  { sscTopicName  :: TopicName,
+    sscKeySerde   :: Serde k,
     sscValueSerde :: Serde v
   }
 
 data StreamSinkConfig k v = StreamSinkConfig
-  { sicTopicName :: TopicName,
-    sicKeySerde :: Serde k,
+  { sicTopicName  :: TopicName,
+    sicKeySerde   :: Serde k,
     sicValueSerde :: Serde v
   }
 
@@ -212,11 +212,11 @@ groupBy f Stream {..} = do
       }
 
 data StreamJoined k1 v1 k2 v2 = StreamJoined
-  { sjK1Serde :: Serde k1,
-    sjV1Serde :: Serde v1,
-    sjK2Serde :: Serde k2,
-    sjV2Serde :: Serde v2,
-    sjThisStore :: StateStore BL.ByteString BL.ByteString,
+  { sjK1Serde    :: Serde k1,
+    sjV1Serde    :: Serde v1,
+    sjK2Serde    :: Serde k2,
+    sjV2Serde    :: Serde v2,
+    sjThisStore  :: StateStore BL.ByteString BL.ByteString,
     sjOtherStore :: StateStore BL.ByteString BL.ByteString
   }
 

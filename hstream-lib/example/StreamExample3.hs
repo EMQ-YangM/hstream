@@ -1,31 +1,31 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StrictData #-}
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE StrictData        #-}
 
-import Data.Aeson
-import qualified Data.Binary as B
-import Data.Maybe
-import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.Encoding as TLE
-import HStream.Encoding
-import HStream.Processor
-import HStream.Store
-import qualified HStream.Stream as HS
-import qualified HStream.Stream.GroupedStream as HG
-import HStream.Stream.SessionWindows
-import qualified HStream.Table as HT
-import HStream.Topic
-import HStream.Util
-import RIO
-import System.Random
-import qualified Prelude as P
-import HStream.Stream.SessionWindowedStream as HSW
+import           Data.Aeson
+import qualified Data.Binary                          as B
+import           Data.Maybe
+import qualified Data.Text.Lazy                       as TL
+import qualified Data.Text.Lazy.Encoding              as TLE
+import           HStream.Encoding
+import           HStream.Processor
+import           HStream.Store
+import qualified HStream.Stream                       as HS
+import qualified HStream.Stream.GroupedStream         as HG
+import           HStream.Stream.SessionWindowedStream as HSW
+import           HStream.Stream.SessionWindows
+import qualified HStream.Table                        as HT
+import           HStream.Topic
+import           HStream.Util
+import qualified Prelude                              as P
+import           RIO
+import           System.Random
 
 data R = R
   { temperature :: Int,
-    humidity :: Int
+    humidity    :: Int
   }
   deriving (Generic, Show, Typeable)
 

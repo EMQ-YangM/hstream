@@ -1,8 +1,8 @@
 {-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StrictData #-}
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude         #-}
+{-# LANGUAGE OverloadedStrings         #-}
+{-# LANGUAGE RecordWildCards           #-}
+{-# LANGUAGE StrictData                #-}
 
 module HStream.Store
   ( KVStore (..),
@@ -29,16 +29,16 @@ module HStream.Store
   )
 where
 
-import Control.Exception (throw)
-import Data.Maybe
-import Data.Typeable
-import HStream.Error
-import HStream.Stream.SessionWindows
-import HStream.Stream.TimeWindows
-import HStream.Type
-import RIO
-import qualified RIO.Map as Map
-import qualified RIO.Text as T
+import           Control.Exception             (throw)
+import           Data.Maybe
+import           Data.Typeable
+import           HStream.Error
+import           HStream.Stream.SessionWindows
+import           HStream.Stream.TimeWindows
+import           HStream.Type
+import           RIO
+import qualified RIO.Map                       as Map
+import qualified RIO.Text                      as T
 
 data InMemoryKVStore k v = InMemoryKVStore
   { imksData :: IORef (Map k v)
@@ -279,7 +279,7 @@ fromEStateStoreToKVStore ::
 fromEStateStoreToKVStore eStore =
   case eStore of
     EKVStateStore s -> fromDEKVStoreToEKVStore s
-    _ -> throw $ UnExpectedStateStoreType "expect KVStateStore"
+    _               -> throw $ UnExpectedStateStoreType "expect KVStateStore"
 
 fromEStateStoreToSessionStore ::
   (Typeable k, Typeable v, Ord k) =>
@@ -359,7 +359,7 @@ instance TimestampedKVStore InMemoryTimestampedKVStore where
               acc <- macc
               map2 <- readIORef rmap2
               case Map.lookup key map2 of
-                Just v -> return $ acc ++ [(mkTimestampedKey key ts, v)]
+                Just v  -> return $ acc ++ [(mkTimestampedKey key ts, v)]
                 Nothing -> return acc
           )
           (return [])

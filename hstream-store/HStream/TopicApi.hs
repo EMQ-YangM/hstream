@@ -1,18 +1,20 @@
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE LambdaCase        #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
-{-# LANGUAGE TypeApplications  #-}
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
 
 module HStream.TopicApi where
 
 import           Control.Exception
 import           Control.Monad
 import           Data.IORef
-import           Data.Int                (Int32)
+import           Data.Int                (Int32, Int64)
 import           Data.Map                (Map)
 import qualified Data.Map                as M
 import           Data.Time
+import           Data.Time.Clock.POSIX
 import           Data.Word
 import           HStream.PubSub
 import           HStream.PubSub.Types
@@ -28,7 +30,7 @@ import           Z.Data.Vector           as V
 data ConsumerRecord = ConsumerRecord
   { crTopic     :: Topic,
     crOffset    :: Offset,
-    crTimestamp :: UTCTime,
+    crTimestamp :: Int64,
     crKey       :: Maybe Bytes,
     crValue     :: Bytes
   }
@@ -38,7 +40,7 @@ data ProducerRecord = ProducerRecord
   { prTopic     :: Topic,
     prKey       :: Maybe Bytes,
     prValue     :: Bytes,
-    prTimestamp :: UTCTime
+    prTimestamp :: Int64
   }
   deriving (Show)
 
@@ -51,10 +53,10 @@ data ProducerConfig = ProducerConfig
 mkProducer :: ProducerConfig -> IO Producer
 mkProducer ProducerConfig {..} = do
   client <- newStreamClient pcpath
-  return (gtm, client)
+  return $ Producer gtm client
 
 sendMessage :: Producer -> ProducerRecord -> IO ()
-sendMessage (gtm', client) pr@ProducerRecord {..} =
+sendMessage (Producer gtm' client) pr@ProducerRecord {..} =
   pub gtm' client prTopic (build $ buildPRecord pr) >>= check
 
 sendMessageBatch :: Producer -> [ProducerRecord] -> IO ()
@@ -72,14 +74,18 @@ data ConsumerConfig = ConsumerConfig
 
 type Timeout = Int32
 
-mkConsumer :: ConsumerConfig -> [Topic] -> IO Consumer
-mkConsumer ConsumerConfig {..} tps = do
+mkConsumer :: ConsumerConfig -> IO Consumer
+mkConsumer ConsumerConfig {..} = do
   client <- newStreamClient ccpath
-  let ms = Prelude.length tps
   ref <- newIORef M.empty
   cp <- createCheckpoint ccname
-  sub gtm client ms tps >>= \case
-    Right r -> return (Consumer ccname r client gtm ref cp)
+  return $ Consumer ccname undefined client gtm ref cp
+
+subs :: Consumer -> [Topic] -> IO Consumer
+subs c@Consumer {..} tps = do
+  let ms = Prelude.length tps
+  sub cglobalTM cstreamclient ms tps >>= \case
+    Right r -> return (c{csreader = r})
     Left e  -> throwIO e
 
 pollMessages :: Consumer -> Int -> Timeout -> IO [ConsumerRecord]
@@ -87,9 +93,11 @@ pollMessages Consumer {..} maxn timout = do
   rs <- pollWithTimeout csreader maxn timout
   forM rs $ \(DataRecord _ seqN payload) -> do
     case P.parse' parsePRecord payload of
-      Left pe -> error $ show pe
-      Right ProducerRecord {..} -> do
-        modifyIORef' coffsetMap $ M.insert prTopic seqN
+      Left pe -> do print pe >> error (show pe)
+      Right r@ProducerRecord {..} -> do
+        (try $ modifyIORef coffsetMap $ M.insert prTopic seqN) >>= \case
+          Left (e :: SomeException) -> print e
+          Right a                   -> print a
         return $ ConsumerRecord prTopic seqN prTimestamp prKey prValue
 
 seek :: Consumer -> Topic -> Offset -> IO ()
@@ -103,7 +111,7 @@ commitOffsets Consumer {..} = do
     Right _ -> return ()
 
 readCommit :: Consumer -> Topic -> IO SequenceNum
-readCommit Consumer{..} tp = do
+readCommit Consumer {..} tp = do
   readCheckpoint cglobalTM cstreamclient checkpoint cname tp >>= \case
     Left e  -> throwIO e
     Right a -> return a
@@ -138,7 +146,7 @@ data AdminClient = AdminClient
     acstreamclient :: StreamClient
   }
 
-type Producer = (GlobalTM, StreamClient)
+data Producer = Producer GlobalTM StreamClient
 
 data Consumer = Consumer
   { cname         :: ClientID,
@@ -154,12 +162,12 @@ gtm = unsafePerformIO $ initGlobalTM
 {-# NOINLINE gtm #-}
 
 buildLengthAndBs :: Bytes -> Builder ()
-buildLengthAndBs bs = int (V.length bs) >> bytes bs
+buildLengthAndBs bs = encodePrim @Int32 (fromIntegral $ V.length bs) >> bytes bs
 
 parserLengthAndBs :: P.Parser Bytes
 parserLengthAndBs = do
-  i <- P.int @Int
-  P.take i
+  i <- P.decodePrim  @Int32
+  P.take (fromIntegral i)
 
 buildPRecord :: ProducerRecord -> Builder ()
 buildPRecord ProducerRecord {..} = do
@@ -170,7 +178,7 @@ buildPRecord ProducerRecord {..} = do
       word8 1
       buildLengthAndBs bs
   buildLengthAndBs prValue
-  utcTime prTimestamp
+  encodePrim @Int64 prTimestamp
 
 parsePRecord :: P.Parser ProducerRecord
 parsePRecord = do
@@ -181,7 +189,7 @@ parsePRecord = do
     1 -> Just <$> parserLengthAndBs
     _ -> error "strange error"
   val <- parserLengthAndBs
-  time <- P.utcTime
+  time <- P.decodePrim @Int64
   return $ ProducerRecord (Topic $ validate tp) key val time
 
 type Offset = SequenceNum
@@ -191,7 +199,7 @@ buildCRecord ConsumerRecord {..} = do
   buildLengthAndBs $ getUTF8Bytes $ getTopic $ crTopic
   let SequenceNum seqN = crOffset
   encodePrim @Word64 seqN
-  utcTime crTimestamp
+  encodePrim @Int64 crTimestamp
   case crKey of
     Nothing -> word8 0
     Just bs -> do
@@ -203,7 +211,7 @@ parseCRecord :: P.Parser ConsumerRecord
 parseCRecord = do
   tp <- parserLengthAndBs
   offset <- P.decodePrim @Word64
-  time <- P.utcTime
+  time <- P.decodePrim @Int64
   w <- P.decodePrim @Word8
   key <- case w of
     0 -> return Nothing
@@ -216,3 +224,12 @@ check :: Either SomeStreamException a -> IO ()
 check (Right _) = return ()
 check (Left e)  = throwIO e
 
+type Timestamp = Int64
+
+posixTimeToMilliSeconds' :: POSIXTime -> Timestamp
+posixTimeToMilliSeconds' =
+  floor . (* 1000) . nominalDiffTimeToSeconds
+
+-- return millisecond timestamp
+getCurrentTimestamp' :: IO Timestamp
+getCurrentTimestamp' = posixTimeToMilliSeconds' <$> getPOSIXTime

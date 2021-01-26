@@ -1,29 +1,12 @@
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DataKinds     #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Api where
 
-import Servant
-  ( Capture,
-    Get,
-    JSON,
-    Post,
-    ReqBody,
-    type (:<|>),
-    type (:>),
-  )
-import Type
-  ( Database,
-    DatabaseId,
-    DatabaseInfo,
-    Resp,
-    StreamId,
-    StreamInfo,
-    StreamSql,
-    Table,
-    TableId,
-    TableInfo,
-  )
+import           Servant (Capture, Get, JSON, Post, ReqBody, type (:<|>),
+                          type (:>))
+import           Type    (Database, DatabaseId, DatabaseInfo, Resp, StreamId,
+                          StreamInfo, StreamSql, Table, TableId, TableInfo)
 
 -- | server api
 -- query/select a.c from

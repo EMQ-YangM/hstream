@@ -1,75 +1,43 @@
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DeriveAnyClass      #-}
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeApplications    #-}
 
 module Main where
 
-import Control.Exception (SomeException, try)
-import Control.Monad (void)
-import Control.Monad.IO.Class (MonadIO (liftIO))
-import Data.Aeson (FromJSON, ToJSON, eitherDecode')
-import Data.ByteString (ByteString)
-import qualified Data.ByteString.Lazy as BL
-import Data.Data (Typeable)
-import Data.List
-import Data.Proxy (Proxy (..))
-import Data.Text (pack)
-import GHC.Generics (Generic)
-import Network.HTTP.Simple
-  ( Request,
-    Response,
-    getResponseBody,
-    httpBS,
-    parseRequest,
-    setRequestBodyJSON,
-    setRequestMethod,
-  )
-import Options.Applicative
-  ( Parser,
-    auto,
-    execParser,
-    fullDesc,
-    help,
-    helper,
-    info,
-    long,
-    metavar,
-    option,
-    progDesc,
-    short,
-    strOption,
-    value,
-    (<**>),
-  )
-import System.Console.Haskeline
-  ( Completion,
-    CompletionFunc,
-    InputT,
-    Settings,
-    completeWord,
-    defaultSettings,
-    getInputLine,
-    runInputT,
-    setComplete,
-    simpleCompletion,
-  )
-import Text.Pretty.Simple (pPrint)
-import Type
-  ( Database (Database),
-    DatabaseInfo,
-    ReqSql (ReqSql),
-    Resp,
-    StreamInfo,
-    StreamSql (StreamSql),
-    Table (Table),
-    TableInfo,
-  )
+import           Control.Exception        (SomeException, try)
+import           Control.Monad            (void)
+import           Control.Monad.IO.Class   (MonadIO (liftIO))
+import           Data.Aeson               (FromJSON, ToJSON, eitherDecode')
+import           Data.ByteString          (ByteString)
+import qualified Data.ByteString.Lazy     as BL
+import           Data.Data                (Typeable)
+import           Data.List
+import           Data.Proxy               (Proxy (..))
+import           Data.Text                (pack)
+import           GHC.Generics             (Generic)
+import           Network.HTTP.Simple      (Request, Response, getResponseBody,
+                                           httpBS, parseRequest,
+                                           setRequestBodyJSON, setRequestMethod)
+import           Options.Applicative      (Parser, auto, execParser, fullDesc,
+                                           help, helper, info, long, metavar,
+                                           option, progDesc, short, strOption,
+                                           value, (<**>))
+import           System.Console.Haskeline (Completion, CompletionFunc, InputT,
+                                           Settings, completeWord,
+                                           defaultSettings, getInputLine,
+                                           runInputT, setComplete,
+                                           simpleCompletion)
+import           Text.Pretty.Simple       (pPrint)
+import           Type                     (Database (Database), DatabaseInfo,
+                                           ReqSql (ReqSql), Resp, StreamInfo,
+                                           StreamSql (StreamSql), Table (Table),
+                                           TableInfo)
 
 data Config = Config
-  { curl :: String,
+  { curl  :: String,
     cport :: Int
   }
   deriving (Show, Eq, Generic, Typeable, FromJSON, ToJSON)
@@ -192,5 +160,5 @@ handleReq Proxy req = do
       case getResponseBody a of
         "" -> putStrLn "invalid command"
         ot -> case eitherDecode' (BL.fromStrict ot) of
-          Left e -> print e
+          Left e           -> print e
           Right (rsp :: a) -> pPrint rsp

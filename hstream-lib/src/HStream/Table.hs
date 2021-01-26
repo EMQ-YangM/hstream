@@ -1,6 +1,6 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StrictData #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE StrictData        #-}
 
 module HStream.Table
   ( Table (..),
@@ -8,16 +8,16 @@ module HStream.Table
   )
 where
 
-import HStream.Encoding
-import HStream.Stream.Internal
-import RIO
-import qualified RIO.Text as T
+import           HStream.Encoding
+import           HStream.Stream.Internal
+import           RIO
+import qualified RIO.Text                as T
 
 data Table k v = Table
-  { tableKeySerde :: Maybe (Serde k),
-    tableValueSerde :: Maybe (Serde v),
-    tableProcessorName :: T.Text,
-    tableStoreName :: T.Text,
+  { tableKeySerde        :: Maybe (Serde k),
+    tableValueSerde      :: Maybe (Serde v),
+    tableProcessorName   :: T.Text,
+    tableStoreName       :: T.Text,
     tableInternalBuilder :: InternalStreamBuilder
   }
 

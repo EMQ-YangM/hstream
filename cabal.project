@@ -6,6 +6,20 @@ packages:
   hstream-sql
   hstream-cli
   hstream-lib
+  z-data
+
+--source-repository-package
+--  type: git
+--  location: https://github.com/haskell-Z/z-data.git
+--  tag: 3349d8744226f467736c3f3786aa929e11864728
+
+--source-repository-package
+--  type: git
+--  location: https://github.com/haskell-Z/z-io.git
+--  tag: 22b3a3b0e37404ecbdbeaec3d7374804dfc2fac3
+
+
+
 --
 --source-repository-package
 --  type: git
